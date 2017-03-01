@@ -4,15 +4,19 @@ using UnityEngine.UI;
 
 public class SwitchInput {
 
+    Transform gvrControllerMainTrans;
     Transform gvrControllerPointerTrans;
     Transform gvrGazePointerTrans;
+    GvrPointerInputModule gvrPointerInputModule;
+    CustomGvrPointerInputModule customGvrPointerInputModule;
 
-    //GvrLaserPointer가 활성화 되어 있으면 GvrReticlePointer가 정상적으로 동작하지 않는다.
-    //GvrReticlePointer를 실행할때는 GvrLaserPointer를 디즈블시킨다.
-    GvrLaserPointer gvrLaserPointer;
+    //GvrLaserPointer의 근본적인 문제가 아니다. 
+    //Cardboard 관련 input과 Daydream 관련 input을 모두 비활성화 시켜 놓고 실행해야 
+    //Cardboard와 Daydream input이 충돌 하지 않는다.
 
-    public void Init()
-    { 
+    public void Init(GameObject eventSystem, GameObject gvrControllerMain)
+    {
+        gvrControllerMainTrans = gvrControllerMain.transform;
         Transform cameraTrans = Camera.main.gameObject.transform;
         gvrControllerPointerTrans = cameraTrans.parent.Find("GvrControllerPointer");
         gvrGazePointerTrans = cameraTrans.Find("CustomReticlePointer");
@@ -21,13 +25,18 @@ public class SwitchInput {
         CheckNull.LogError("gvrControllerPointerTrans is null", gvrControllerPointerTrans);
 
         Transform laserTrans = gvrControllerPointerTrans.transform.Find("Laser");
-        if (laserTrans)
-            gvrLaserPointer = laserTrans.GetComponent<GvrLaserPointer>();
-        CheckNull.LogError("gvrLaserPointer is null", gvrLaserPointer);
+
+        gvrPointerInputModule = eventSystem.GetComponent<GvrPointerInputModule>();
+        customGvrPointerInputModule = eventSystem.GetComponent<CustomGvrPointerInputModule>();
+
+        CheckNull.LogError("gvrPointerInputModule is null", gvrPointerInputModule);
+        CheckNull.LogError("customGvrPointerInputModule is null", customGvrPointerInputModule);
     }
 	
-    public void ChangeCardboardMode()
+    public void ChangeMode(SwitchVRMode.UseVrDevice useVrDevice)
     {
+        gvrControllerMainTrans.gameObject.SetActive(useVrDevice == SwitchVRMode.UseVrDevice.DAYDREAM);
+
         GameObject[] objects = null;
         try
         {
@@ -48,10 +57,16 @@ public class SwitchInput {
             if (obj.layer != LayerMask.NameToLayer("UI"))
                 continue;
 
-            SetCardboardUI(obj);
+            if (useVrDevice == SwitchVRMode.UseVrDevice.CARDBOARD)
+                SetCardboardUI(obj);
+            else if (useVrDevice == SwitchVRMode.UseVrDevice.DAYDREAM)
+                SetDaydreamUI(obj);
         }
 
-        SetCardboardCursor();
+        SetCardboardCursor(useVrDevice == SwitchVRMode.UseVrDevice.CARDBOARD);
+
+        customGvrPointerInputModule.enabled = (useVrDevice == SwitchVRMode.UseVrDevice.CARDBOARD);
+        gvrPointerInputModule.enabled = (useVrDevice == SwitchVRMode.UseVrDevice.DAYDREAM);
     }
 
     void SetDaydreamUI(GameObject obj)
@@ -78,10 +93,9 @@ public class SwitchInput {
         graphicRaycaster.enabled = false;
     }
 
-    void SetCardboardCursor()
+    void SetCardboardCursor(bool isGaze)
     {
-        gvrGazePointerTrans.gameObject.SetActive(true);
-        gvrControllerPointerTrans.gameObject.SetActive(false);
-        gvrLaserPointer.enabled = false;
+        gvrGazePointerTrans.gameObject.SetActive(isGaze);
+        gvrControllerPointerTrans.gameObject.SetActive(!isGaze);
     }
 }
